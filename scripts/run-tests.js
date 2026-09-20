@@ -3,7 +3,9 @@ const vm = require('vm');
 const path = require('path');
 global.window = global;
 global.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
-for (const file of ['config.js','finance.js','market.js','events.js','replay.js','tests.js']) {
+global.cancelAnimationFrame = () => {};
+global.requestAnimationFrame = () => 1;
+for (const file of ['config.js','finance.js','market.js','events.js','replay.js','controller.js','tests.js']) {
   vm.runInThisContext(fs.readFileSync(path.join(__dirname, '..', 'js', file), 'utf8'), { filename: file });
 }
 const report = TimeMarket.Tests.run();

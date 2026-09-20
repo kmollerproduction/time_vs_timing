@@ -21,6 +21,7 @@
     test('O Marknadens slutpunkt',()=>{const m=T.Market.generateFuture(config);assert(near(m.indexes.at(-1),100*Math.pow(1+config.annualMarketReturn,config.years),1e-10));});
     test('P Oberoende serier',()=>{const h=T.Market.generateHistory(config),f=T.Market.generateFuture(config);assert(h.returns!==f.returns&&h.returns.length===60&&f.returns.length===240&&near(h.indexes.at(-1),100));});
     test('Q Transaktioner bevarar kapital',()=>{let p=T.Finance.createPortfolio(123456,.63,0);for(const fn of [x=>T.Finance.rebalanceUnlocked(x,.25),x=>T.Finance.createLeverage(x,.25),x=>T.Finance.moveUnlockedToFixed(x),x=>T.Finance.closeLeverageAndSplit(x,.5)]){const before=T.Finance.total(p);p=fn(p);assert(near(before,T.Finance.total(p)));}});
+    test('R Pausbegäran vid månadsgräns',()=>{const c=new T.GameController(config,()=>{});c.state={running:true,pendingManual:false,currentMonth:5,currentScreen:'game',marketPath:Array(240).fill(0),portfolio:T.Finance.createPortfolio(100000,1,config.insuranceFee),buyHold:T.Finance.createPortfolio(100000,1,config.insuranceFee),decisionLog:[]};c.requestManual();c.requestManual();assert(c.state.pendingManual);c.advanceMonth();assert(c.state.currentMonth===6&&!c.state.running&&c.state.currentScreen==='manual');});
     return {pass:results.every(r=>r.pass),results};
   }
   T.Tests={run};

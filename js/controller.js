@@ -13,7 +13,7 @@
       this.state.decisionLog=[{month:0,type:'initial',equityShare}];this.state.currentScreen='game';this.resume();
     }
     resume(){this.state.running=true;this.state.pendingManual=false;this.lastTime=performance.now();cancelAnimationFrame(this.raf);this.raf=requestAnimationFrame(t=>this.tick(t));this.emit();}
-    requestManual(){if(!this.state.running)return;this.state.pendingManual=true;this.emit();}
+    requestManual(){if(!this.state.running||this.state.pendingManual)return;this.state.pendingManual=true;this.emit();}
     tick(now){
       if(!this.state.running)return;const dt=Math.min(.1,(now-this.lastTime)/1000);this.lastTime=now;this.state.activeElapsed+=dt;
       const exact=Math.min(this.config.months,this.state.activeElapsed/this.config.gameDurationSeconds*this.config.months);
