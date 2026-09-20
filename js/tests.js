@@ -1,0 +1,27 @@
+(function (T) {
+  'use strict';
+  const near=(a,b,eps=1e-8)=>Math.abs(a-b)<=eps*Math.max(1,Math.abs(a),Math.abs(b));
+  function run(config=T.Config.clone(T.Config.defaults)) {
+    const results=[]; const test=(name,fn)=>{try{fn();results.push({name,pass:true});}catch(e){results.push({name,pass:false,error:e.message});}};
+    const assert=(x,m)=>{if(!x)throw new Error(m||'Assertion misslyckades');};
+    test('A Buy & Hold-identitet',()=>{const path=Array(240).fill(.004);const d=[{month:0,type:'initial',equityShare:1},...T.Events.definitions.map(e=>({month:e.triggerMonth,type:'event',eventId:e.id,accepted:false}))];assert(near(T.Replay.simulate(config,path,d).finalValue,T.Replay.buyAndHold(config,path).finalValue));});
+    test('B Effektiv ränta',()=>assert(near(Math.pow(Math.pow(1+config.annualFixedReturn,1/12),12),1+config.annualFixedReturn)));
+    test('C Fondavgift',()=>{let p=T.Finance.createPortfolio(120000,1,0);p=T.Finance.simulateMonth(p,0,1,{...config,annualFixedReturn:0,pensionTax:0});assert(near(p.cumulativeNormalFundFees,120000*config.normalFundFee/12));});
+    test('D Försäkringsavgift',()=>{let p=T.Finance.createPortfolio(120000,0,config.insuranceFee);p=T.Finance.simulateMonth(p,0,1,{...config,annualFixedReturn:0,normalFundFee:0,pensionTax:0});assert(near(p.cumulativeInsuranceFees,120000*config.insuranceFee/12));});
+    test('E Skatt på årets startvärde',()=>{let p=T.Finance.createPortfolio(100000,0,0);for(let m=1;m<=12;m++)p=T.Finance.simulateMonth(p,0,m,{...config,annualFixedReturn:0,normalFundFee:0,pensionTax:.0035});assert(near(p.cumulativeTax,350));});
+    test('F Hävstångsavkastning',()=>{for(const r of [.1,-.1]){let p=T.Finance.createPortfolio(100,0,0);p.lockedLeveraged=100;p.fixedInterest=0;p=T.Finance.simulateMonth(p,r,1,{...config,annualFixedReturn:0,leveragedFundFee:0,pensionTax:0});assert(near(p.lockedLeveraged,100*(1+r*1.5)));}});
+    test('G Volatilitetsdrag',()=>{let p=T.Finance.createPortfolio(100,0,0);p.lockedLeveraged=100;p.fixedInterest=0;const c={...config,annualFixedReturn:0,leveragedFundFee:0,pensionTax:0};p=T.Finance.simulateMonth(p,-.2,1,c);p=T.Finance.simulateMonth(p,.25,2,c);assert(near(p.lockedLeveraged,96.25));});
+    test('H Allokering driver',()=>{let p=T.Finance.createPortfolio(100,.5,0);p=T.Finance.simulateMonth(p,.2,1,{...config,annualFixedReturn:0,normalFundFee:0,pensionTax:0});assert(!near(T.Finance.allocations(p).equity,.5));});
+    test('I Manuell omviktning',()=>{let p=T.Finance.createPortfolio(100,.7,0);p=T.Finance.rebalanceUnlocked(p,.5);assert(near(p.normalEquity,50)&&near(p.fixedInterest,50));});
+    test('J Hävstångsköp',()=>{let p=T.Finance.createPortfolio(120000,.6,0);p=T.Finance.createLeverage(p,.25);assert(near(p.lockedLeveraged,30000)&&near(p.normalEquity+p.fixedInterest,90000)&&near(T.Finance.total(p),120000));});
+    test('K Låst del driver',()=>{let p=T.Finance.createPortfolio(100000,.5,0);p.lockedLeveraged=40000;assert(near(p.lockedLeveraged,40000));});
+    test('L Omviktning med låst del',()=>{let p=T.Finance.createPortfolio(100000,.5,0);p.lockedLeveraged=40000;p=T.Finance.rebalanceUnlocked(p,.25);assert(near(p.lockedLeveraged,40000)&&near(p.normalEquity,25000)&&near(p.fixedInterest,75000));});
+    test('M År 10',()=>{let p={...T.Finance.createPortfolio(100000,.5,0),lockedLeveraged:40000};p=T.Finance.moveUnlockedToFixed(p);assert(p.normalEquity===0&&near(p.fixedInterest,100000)&&near(p.lockedLeveraged,40000));});
+    test('N År 17',()=>{let p={...T.Finance.createPortfolio(100000,.5,0),lockedLeveraged:40000};p=T.Finance.closeLeverageAndSplit(p,.5);assert(p.lockedLeveraged===0&&near(p.normalEquity,70000)&&near(p.fixedInterest,70000));});
+    test('O Marknadens slutpunkt',()=>{const m=T.Market.generateFuture(config);assert(near(m.indexes.at(-1),100*Math.pow(1+config.annualMarketReturn,config.years),1e-10));});
+    test('P Oberoende serier',()=>{const h=T.Market.generateHistory(config),f=T.Market.generateFuture(config);assert(h.returns!==f.returns&&h.returns.length===60&&f.returns.length===240&&near(h.indexes.at(-1),100));});
+    test('Q Transaktioner bevarar kapital',()=>{let p=T.Finance.createPortfolio(123456,.63,0);for(const fn of [x=>T.Finance.rebalanceUnlocked(x,.25),x=>T.Finance.createLeverage(x,.25),x=>T.Finance.moveUnlockedToFixed(x),x=>T.Finance.closeLeverageAndSplit(x,.5)]){const before=T.Finance.total(p);p=fn(p);assert(near(before,T.Finance.total(p)));}});
+    return {pass:results.every(r=>r.pass),results};
+  }
+  T.Tests={run};
+})(window.TimeMarket = window.TimeMarket || {});
