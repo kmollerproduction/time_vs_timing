@@ -8,6 +8,7 @@
       this.state={currentScreen:'start',currentMonth:0,visualProgress:0,marketPath:future.returns,marketIndexes:future.indexes,marketHistory:history.indexes,portfolio:null,buyHold:null,decisionLog:[],pendingEvent:null,pendingManual:false,running:false,activeElapsed:0,results:null,generatorStats:future.stats};this.emit();
     }
     start(equityShare){
+      if(!this.state.marketPath){const future=T.Market.generateFuture(this.config),history=T.Market.generateHistory(this.config);this.state.marketPath=future.returns;this.state.marketIndexes=future.indexes;this.state.marketHistory=history.indexes;this.state.generatorStats=future.stats;}
       this.state.portfolio=T.Finance.createPortfolio(this.config.startingCapital,equityShare,this.config.insuranceFee);
       this.state.buyHold=T.Finance.createPortfolio(this.config.startingCapital,1,this.config.insuranceFee);
       this.state.decisionLog=[{month:0,type:'initial',equityShare}];this.state.currentScreen='game';this.resume();
@@ -33,6 +34,10 @@
       if(this.state.pendingManual){this.pause();this.state.currentScreen='manual';}
     }
     pause(){this.state.running=false;cancelAnimationFrame(this.raf);}
+    abort(){
+      this.pause();const marketHistory=this.state.marketHistory;
+      this.state={currentScreen:'start',currentMonth:0,visualProgress:0,marketPath:null,marketIndexes:null,marketHistory,portfolio:null,buyHold:null,decisionLog:[],pendingEvent:null,pendingManual:false,running:false,activeElapsed:0,results:null,generatorStats:null};this.emit();
+    }
     chooseManual(equityShare){
       this.state.portfolio=T.Finance.rebalanceUnlocked(this.state.portfolio,equityShare);
       this.state.decisionLog.push({month:this.state.currentMonth,type:'manual',equityShare});this.state.currentScreen='game';this.resume();
