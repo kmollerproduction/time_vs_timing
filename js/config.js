@@ -1,7 +1,9 @@
 (function (T) {
   'use strict';
+  const configVersion = 2;
   const defaults = Object.freeze({
-    startingCapital: 100000, years: 20, months: 240, historyMonths: 60,
+    configVersion,
+    startingCapital: 1000000, years: 20, months: 240, historyMonths: 60,
     annualMarketReturn: 0.085, annualFixedReturn: 0.02,
     insuranceFee: 0.0065, newInsuranceFee: 0,
     normalFundFee: 0.01, leveragedFundFee: 0.015,
@@ -25,7 +27,14 @@
     return out;
   }
   function load() {
-    try { return merge(defaults, JSON.parse(localStorage.getItem(key) || '{}')); }
+    try {
+      const saved=JSON.parse(localStorage.getItem(key) || '{}');
+      if(saved.configVersion!==configVersion){
+        if(saved.startingCapital===100000)saved.startingCapital=defaults.startingCapital;
+        saved.configVersion=configVersion;localStorage.setItem(key,JSON.stringify(saved));
+      }
+      return merge(defaults,saved);
+    }
     catch (_) { return clone(defaults); }
   }
   function save(config) { localStorage.setItem(key, JSON.stringify(config)); }
