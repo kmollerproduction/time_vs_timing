@@ -1,5 +1,9 @@
 (function (T) {
   'use strict';
+  function displaySnapshot(state){
+    const playerValue=Math.round(T.Finance.total(state.portfolio)),buyHoldValue=Math.round(T.Finance.total(state.buyHold));
+    return {month:state.currentMonth,playerValue,buyHoldValue,difference:playerValue-buyHoldValue};
+  }
   class GameController {
     constructor(config,onChange){this.config=config;this.onChange=onChange||(()=>{});this.raf=0;this.lastTime=0;this.state={currentScreen:'admin'};}
     emit(){this.onChange(this.state);}
@@ -11,7 +15,7 @@
       if(!this.state.marketPath){const future=T.Market.generateFuture(this.config),history=T.Market.generateHistory(this.config);this.state.marketPath=future.returns;this.state.marketIndexes=future.indexes;this.state.marketHistory=history.indexes;this.state.generatorStats=future.stats;}
       this.state.portfolio=T.Finance.createPortfolio(this.config.startingCapital,equityShare,this.config.insuranceFee);
       this.state.buyHold=T.Finance.createPortfolio(this.config.startingCapital,1,this.config.insuranceFee);
-      this.state.decisionLog=[{month:0,type:'initial',equityShare}];this.state.currentScreen='game';this.resume();
+      this.state.decisionLog=[{month:0,type:'initial',equityShare}];this.state.lastSelectedEquityShare=equityShare;this.state.currentScreen='game';this.state.displaySnapshot=displaySnapshot(this.state);this.resume();
     }
     resume(){this.state.running=true;this.state.pendingManual=false;this.lastTime=performance.now();cancelAnimationFrame(this.raf);this.raf=requestAnimationFrame(t=>this.tick(t));this.emit();}
     requestManual(){if(!this.state.running||this.state.pendingManual)return;this.state.pendingManual=true;this.emit();}
@@ -27,7 +31,7 @@
       const month=this.state.currentMonth+1,r=this.state.marketPath[month-1];
       this.state.portfolio=T.Finance.simulateMonth(this.state.portfolio,r,month,this.config);
       this.state.buyHold=T.Finance.simulateMonth(this.state.buyHold,r,month,this.config);
-      this.state.currentMonth=month;this.state.visualProgress=0;
+      this.state.currentMonth=month;this.state.visualProgress=0;this.state.displaySnapshot=displaySnapshot(this.state);
       if(month>=this.config.months){this.finish();return;}
       const event=T.Events.atMonth(month);
       if(event){this.pause();this.state.pendingEvent=event;this.state.currentScreen='event';return;}
@@ -40,12 +44,14 @@
     }
     chooseManual(equityShare){
       this.state.portfolio=T.Finance.rebalanceUnlocked(this.state.portfolio,equityShare);
-      this.state.decisionLog.push({month:this.state.currentMonth,type:'manual',equityShare});this.state.currentScreen='game';this.resume();
+      this.state.lastSelectedEquityShare=equityShare;this.state.displaySnapshot=displaySnapshot(this.state);this.state.decisionLog.push({month:this.state.currentMonth,type:'manual',equityShare});this.state.currentScreen='game';this.resume();
     }
     chooseEvent(accepted){
       const e=this.state.pendingEvent;this.state.portfolio=e.apply(this.state.portfolio,accepted,this.config);
       this.state.decisionLog.push({month:this.state.currentMonth,type:'event',eventId:e.id,accepted});
-      this.state.pendingEvent=null;this.state.currentScreen='game';this.resume();
+      if(accepted&&e.id==='fixed')this.state.lastSelectedEquityShare=0;
+      if(accepted&&e.id==='reduce')this.state.lastSelectedEquityShare=.5;
+      this.state.displaySnapshot=displaySnapshot(this.state);this.state.pendingEvent=null;this.state.currentScreen='game';this.resume();
     }
     finish(){
       this.pause();const actual=T.Replay.simulate(this.config,this.state.marketPath,this.state.decisionLog);
@@ -55,5 +61,6 @@
       this.state.currentScreen='result';this.emit();
     }
   }
+  T.GameDisplaySnapshot=displaySnapshot;
   T.GameController=GameController;
 })(window.TimeMarket = window.TimeMarket || {});
